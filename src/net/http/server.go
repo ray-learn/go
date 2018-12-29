@@ -3,6 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // HTTP server. See RFC 7230 through 7235.
+// HTTP 服务端
 
 package http
 
@@ -33,6 +34,7 @@ import (
 )
 
 // Errors used by the HTTP server.
+// HTTP 服务端使用的错误码
 var (
 	// ErrBodyNotAllowed is returned by ResponseWriter.Write calls
 	// when the HTTP method or response code does not permit a
@@ -59,21 +61,27 @@ var (
 )
 
 // A Handler responds to an HTTP request.
-//
+// Handler用于响应HTTP请求
 // ServeHTTP should write reply headers and data to the ResponseWriter
 // and then return. Returning signals that the request is finished; it
 // is not valid to use the ResponseWriter or read from the
 // Request.Body after or concurrently with the completion of the
 // ServeHTTP call.
+// ServeHTTP 将响应头和响应体数据写入ResponseWriter，然后返回
+// 返回信号标识请求结束，并且ServeHTTP调用完成后，禁止使用ResponseWriter或者从Request.Body读数据
 //
 // Depending on the HTTP client software, HTTP protocol version, and
 // any intermediaries between the client and the Go server, it may not
 // be possible to read from the Request.Body after writing to the
 // ResponseWriter. Cautious handlers should read the Request.Body
 // first, and then reply.
+// 基于HTTP客户端软件，HTTP协议版本，以及各种在客户端和Go服务端的中间件
+// 有可能在写入ResponseWriter以后，无法从Request.Body中读取数据
+// 注意：handlers先从Request.Body读取数据，然后再回写响应
 //
 // Except for reading the body, handlers should not modify the
 // provided Request.
+// 除了读取请求体，handlers不应该修改请求
 //
 // If ServeHTTP panics, the server (the caller of ServeHTTP) assumes
 // that the effect of the panic was isolated to the active request.
@@ -82,12 +90,17 @@ var (
 // RST_STREAM, depending on the HTTP protocol. To abort a handler so
 // the client sees an interrupted response but the server doesn't log
 // an error, panic with the value ErrAbortHandler.
+// 若ServeHTTP出错，服务端假设错误的影响与活动的请求无关
+// 跳过错误，记录服务端错误日志的栈跟踪，或者关闭网络连接
+// 或者根据HTTP协议发送HTTP/2 RST_STREAM
+// 终止handler，客户端可以看到中断的相应，但是服务端无法记录错误日志
 type Handler interface {
 	ServeHTTP(ResponseWriter, *Request)
 }
 
 // A ResponseWriter interface is used by an HTTP handler to
 // construct an HTTP response.
+// ResponseWriter用于构造HTTP响应
 //
 // A ResponseWriter may not be used after the Handler.ServeHTTP method
 // has returned.
@@ -1988,9 +2001,11 @@ func requestBodyRemains(rc io.ReadCloser) bool {
 // ordinary functions as HTTP handlers. If f is a function
 // with the appropriate signature, HandlerFunc(f) is a
 // Handler that calls f.
+// HandlerFunc函数类型适配器
 type HandlerFunc func(ResponseWriter, *Request)
 
 // ServeHTTP calls f(w, r).
+// 实现Handle接口
 func (f HandlerFunc) ServeHTTP(w ResponseWriter, r *Request) {
 	f(w, r)
 }

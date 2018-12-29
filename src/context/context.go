@@ -5,6 +5,7 @@
 // Package context defines the Context type, which carries deadlines,
 // cancelation signals, and other request-scoped values across API boundaries
 // and between processes.
+// Context类型的设计：deadlines，cancelation signals，request-scoped values
 //
 // Incoming requests to a server should create a Context, and outgoing
 // calls to servers should accept a Context. The chain of function
@@ -12,6 +13,7 @@
 // it with a derived Context created using WithCancel, WithDeadline,
 // WithTimeout, or WithValue. When a Context is canceled, all
 // Contexts derived from it are also canceled.
+// Context的创建和接收情况，函数链，派生Context的创建，Context继承链的取消
 //
 // The WithCancel, WithDeadline, and WithTimeout functions take a
 // Context (the parent) and return a derived Context (the child) and a
@@ -21,10 +23,12 @@
 // child and its children until the parent is canceled or the timer
 // fires. The go vet tool checks that CancelFuncs are used on all
 // control-flow paths.
+// 派生Context的创建方式，取消函数的调用和特点
 //
 // Programs that use Contexts should follow these rules to keep interfaces
 // consistent across packages and enable static analysis tools to check context
 // propagation:
+// 接口一致性和代码校验
 //
 // Do not store Contexts inside a struct type; instead, pass a Context
 // explicitly to each function that needs it. The Context should be the first
@@ -59,10 +63,12 @@ import (
 // API boundaries.
 //
 // Context's methods may be called by multiple goroutines simultaneously.
+// Context接口类型和调用场景
 type Context interface {
 	// Deadline returns the time when work done on behalf of this context
 	// should be canceled. Deadline returns ok==false when no deadline is
 	// set. Successive calls to Deadline return the same results.
+	// 设置deadline与否
 	Deadline() (deadline time.Time, ok bool)
 
 	// Done returns a channel that's closed when work done on behalf of this
@@ -94,6 +100,7 @@ type Context interface {
 	//
 	// See https://blog.golang.org/pipelines for more examples of how to use
 	// a Done channel for cancelation.
+	// 信号通道
 	Done() <-chan struct{}
 
 	// If Done is not yet closed, Err returns nil.
@@ -152,10 +159,13 @@ type Context interface {
 }
 
 // Canceled is the error returned by Context.Err when the context is canceled.
+// Canceled作为Context.Err用于context取消时候返回
 var Canceled = errors.New("context canceled")
 
 // DeadlineExceeded is the error returned by Context.Err when the context's
 // deadline passes.
+// TODO: 使用type定义的命名空结构类型赋值error类型变量?
+// error内置类型是接口，定义命名空结构体定制实现error接口?
 var DeadlineExceeded error = deadlineExceededError{}
 
 type deadlineExceededError struct{}
@@ -166,6 +176,7 @@ func (deadlineExceededError) Temporary() bool { return true }
 
 // An emptyCtx is never canceled, has no values, and has no deadline. It is not
 // struct{}, since vars of this type must have distinct addresses.
+// 万物皆空的Context
 type emptyCtx int
 
 func (*emptyCtx) Deadline() (deadline time.Time, ok bool) {
@@ -203,6 +214,7 @@ var (
 // values, and has no deadline. It is typically used by the main function,
 // initialization, and tests, and as the top-level Context for incoming
 // requests.
+// 基础Context，用于初始化，测试及处理请求的顶级Context
 func Background() Context {
 	return background
 }
@@ -218,6 +230,7 @@ func TODO() Context {
 // A CancelFunc tells an operation to abandon its work.
 // A CancelFunc does not wait for the work to stop.
 // After the first call, subsequent calls to a CancelFunc do nothing.
+// 取消函数，非阻塞，一次调用
 type CancelFunc func()
 
 // WithCancel returns a copy of parent with a new Done channel. The returned
@@ -226,6 +239,7 @@ type CancelFunc func()
 //
 // Canceling this context releases resources associated with it, so code should
 // call cancel as soon as the operations running in this Context complete.
+// 取消型派生Context，复制父Context
 func WithCancel(parent Context) (ctx Context, cancel CancelFunc) {
 	c := newCancelCtx(parent)
 	propagateCancel(parent, &c)
@@ -233,11 +247,13 @@ func WithCancel(parent Context) (ctx Context, cancel CancelFunc) {
 }
 
 // newCancelCtx returns an initialized cancelCtx.
+// newCancelCtx返回初始化的cancelCtx
 func newCancelCtx(parent Context) cancelCtx {
 	return cancelCtx{Context: parent}
 }
 
 // propagateCancel arranges for child to be canceled when parent is.
+// propagateCancel管理子类的取消
 func propagateCancel(parent Context, child canceler) {
 	if parent.Done() == nil {
 		return // parent is never canceled
@@ -268,6 +284,7 @@ func propagateCancel(parent Context, child canceler) {
 // parentCancelCtx follows a chain of parent references until it finds a
 // *cancelCtx. This function understands how each of the concrete types in this
 // package represents its parent.
+// for语句的设计
 func parentCancelCtx(parent Context) (*cancelCtx, bool) {
 	for {
 		switch c := parent.(type) {
@@ -284,6 +301,7 @@ func parentCancelCtx(parent Context) (*cancelCtx, bool) {
 }
 
 // removeChild removes a context from its parent.
+// removeChild将context从其父类处移除
 func removeChild(parent Context, child canceler) {
 	p, ok := parentCancelCtx(parent)
 	if !ok {
@@ -298,6 +316,7 @@ func removeChild(parent Context, child canceler) {
 
 // A canceler is a context type that can be canceled directly. The
 // implementations are *cancelCtx and *timerCtx.
+// 取消器接口
 type canceler interface {
 	cancel(removeFromParent bool, err error)
 	Done() <-chan struct{}
@@ -312,6 +331,7 @@ func init() {
 
 // A cancelCtx can be canceled. When canceled, it also cancels any children
 // that implement canceler.
+// cancelCtx结构体
 type cancelCtx struct {
 	Context
 
@@ -408,6 +428,7 @@ func WithDeadline(parent Context, d time.Time) (Context, CancelFunc) {
 // A timerCtx carries a timer and a deadline. It embeds a cancelCtx to
 // implement Done and Err. It implements cancel by stopping its timer then
 // delegating to cancelCtx.cancel.
+// timerCtx拥有timer和deadline
 type timerCtx struct {
 	cancelCtx
 	timer *time.Timer // Under cancelCtx.mu.
